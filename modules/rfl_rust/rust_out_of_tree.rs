@@ -13,17 +13,17 @@ module! {
 }
 
 struct RustMinimal {
-    numbers: Vec<i32>,
+    numbers: KVec<i32>,
 }
 
 impl kernel::Module for RustMinimal {
-    fn init(_name: &'static CStr, _module: &'static ThisModule) -> Result<Self> {
-        pr_alert!("Rust out-of-tree sample (init)\n");
+    fn init(_module: &'static ThisModule) -> Result<Self> {
+        pr_info!("Rust out-of-tree sample (init)\n");
 
         let mut numbers = Vec::new();
-        numbers.try_push(72)?;
-        numbers.try_push(108)?;
-        numbers.try_push(200)?;
+        numbers.push(72, GFP_KERNEL)?;
+        numbers.push(108, GFP_KERNEL)?;
+        numbers.push(200, GFP_KERNEL)?;
 
         Ok(RustMinimal { numbers })
     }
@@ -31,7 +31,7 @@ impl kernel::Module for RustMinimal {
 
 impl Drop for RustMinimal {
     fn drop(&mut self) {
-        pr_alert!("My numbers are {:?}\n", self.numbers);
-        pr_alert!("Rust out-of-tree sample (exit)\n");
+        pr_info!("My numbers are {:?}\n", self.numbers);
+        pr_info!("Rust out-of-tree sample (exit)\n");
     }
 }

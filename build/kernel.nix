@@ -1,24 +1,29 @@
-{
-  stdenv,
-  lib,
-  callPackage,
-  rustc,
-  cargo,
-  rust-bindgen,
-  buildPackages,
-  rustPlatform,
-}: {
-  src,
-  configfile,
-  modDirVersion,
-  version,
-  enableRust ? false, # Install the Rust Analyzer
-  enableGdb ? false, # Install the GDB scripts
-  kernelPatches ? [],
-  nixpkgs, # Nixpkgs source
-}: let
+{ stdenv
+, lib
+, callPackage
+, rustc
+, rustfmt
+, rust-bindgen
+, buildPackages
+, clippy
+, buildEnv
+, rust-src
+,
+}: { src
+   , configfile
+   , modDirVersion
+   , version
+   , enableRust ? false
+   , # Install the Rust Analyzer
+     enableGdb ? false
+   , # Install the GDB scripts
+     kernelPatches ? [ ]
+   , nixpkgs
+   , # Nixpkgs source
+   }:
+let
   kernel =
-    ((callPackage "${nixpkgs}/pkgs/os-specific/linux/kernel/manual-config.nix" {})
+    ((callPackage "${nixpkgs}/pkgs/os-specific/linux/kernel/manual-config.nix" { })
       {
         inherit src modDirVersion version kernelPatches configfile;
         inherit lib stdenv;
@@ -31,12 +36,11 @@
           # Enables the dev build
           CONFIG_MODULES = "y";
         };
-      })
-    .overrideAttrs (old: {
+      }).overrideAttrs (old: {
       nativeBuildInputs =
         old.nativeBuildInputs
-        ++ lib.optionals enableRust [rustc cargo rust-bindgen];
-      RUST_LIB_SRC = lib.optionalString enableRust rustPlatform.rustLibSrc;
+        ++ lib.optionals enableRust [ rustc rustfmt clippy rust-bindgen ];
+      RUST_LIB_SRC = "${rust-src}/lib/rustlib/src/rust/library";
 
       dontStrip = true;
 
@@ -48,8 +52,9 @@
         fi
         make modules_install $makeFlags "''${makeFlagsArray[@]}" \
           $installFlags "''${installFlagsArray[@]}"
-        unlink $out/lib/modules/${modDirVersion}/build
-        unlink $out/lib/modules/${modDirVersion}/source
+
+        rm -drf $out/lib/modules/${modDirVersion}/build
+        rm -drf $out/lib/modules/${modDirVersion}/source
 
         mkdir -p $dev/lib/modules/${modDirVersion}/{build,source}
 
@@ -64,7 +69,11 @@
 
         make modules_prepare $makeFlags "''${makeFlagsArray[@]}" O=$dev/lib/modules/${modDirVersion}/build
         ${lib.optionalString enableRust ''
-          make rust-analyzer $makeFlags "''${makeFlagsArray[@]}" O=$dev/lib/modules/${modDirVersion}/build
+
+          # the check is unnecessary and will probably be removed in the future
+          sed -i '/assert args.sysroot in args.sysroot_src.parents/d' scripts/generate_rust_analyzer.py 
+
+          make rust-analyzer O=$dev/lib/modules/${modDirVersion}/build
         ''}
         ${lib.optionalString enableGdb ''
           echo "Make scripts"
@@ -93,7 +102,7 @@
   kernelPassthru = {
     inherit (configfile) structuredConfig;
     inherit modDirVersion configfile;
-    passthru = kernel.passthru // (removeAttrs kernelPassthru ["passthru"]);
+    passthru = kernel.passthru // (removeAttrs kernelPassthru [ "passthru" ]);
   };
 in
-  lib.extendDerivation true kernelPassthru kernel
+lib.extendDerivation true kernelPassthru kernel

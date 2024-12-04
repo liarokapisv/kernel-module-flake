@@ -1,14 +1,17 @@
-{
-  pkgs,
-  lib ? pkgs.lib,
-  enableRust,
-  enableBPF,
-  enableGdb,
-  useRustForLinux,
-}: let
-  version = "6.1.4";
+{ lib
+, enableRust
+, enableBPF
+, enableGdb
+, useRustForLinux
+, fetchFromGitHub
+, fetchurl
+,
+}:
+let
+  version = "6.13.0-rc1";
   localVersion = "-development";
-in {
+in
+{
   kernelArgs = {
     inherit enableRust enableGdb;
 
@@ -16,45 +19,21 @@ in {
     src =
       if useRustForLinux
       then
-        builtins.fetchurl {
-          url = "https://github.com/Rust-for-Linux/linux/archive/bd123471269354fdd504b65b1f1fe5167cb555fc.tar.gz";
-          sha256 = "sha256-BcTrK9tiGgCsmYaKpS/Xnj/nsCVGA2Aoa1AktHBgbB0=";
-        }
+        fetchFromGitHub
+          {
+            owner = "Rust-for-Linux";
+            repo = "linux";
+            rev = "40384c840ea1944d7c5a392e8975ed088ecf0b37";
+            hash = "sha256-hRpa524OMPX8MJxX6QliFNyV9XcfDrvBvuAnFXmSbkw=";
+          }
       else
-        pkgs.fetchurl {
-          url = "mirror://kernel/linux/kernel/v6.x/linux-${version}.tar.xz";
-          sha256 = "sha256-iqj2T6YLsTOBqWCNH++90FVeKnDECyx9BnGw1kqkVZ4=";
+        fetchurl {
+          url = "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/linux-next-next-20241203.tar.gz";
+          sha256 = "sha256-s+AJXQwOMDsPtxo2yBgJIq3NYHTApmJmMm6TD+D9wGw=";
         };
-
-    # Add kernel patches here
-    kernelPatches = let
-      fetchSet = lib.imap1 (i: hash: {
-        # name = " "kbuild-v${builtins.toString i}";
-        patch = pkgs.fetchpatch {
-          inherit hash;
-          url = "https://lore.kernel.org/rust-for-linux/20230109204520.539080-${builtins.toString i}-ojeda@kernel.org/raw";
-        };
-      });
-
-      patches = fetchSet [
-        "sha256-6WTde8P8GkDcBwVnlS6jws126vU7TCxF6/pLgFZE5gc="
-        "sha256-2RBeX5vFN88GVgRkzwK/7Gzl2iSWr4OqkdqoSgJPml0="
-        "sha256-oyR4traQbjq0+OMVL8q6UZicBh43TKN1BlhZsCTy7aU="
-        "sha256-2RBeX5vFN88GVgRkzwK/7Gzl2iSWr4OqkdqoSgJPml0="
-        "sha256-05VnWFMMar7YILTHVh9RLueRlW00pk3CjGKT7XDb7D0="
-        "sha256-qOZaHfZMc7Y2A0LdDJDO3Zi7QbdsBxZZoPmYKahkznw="
-      ];
-    in
-      patches;
 
     inherit localVersion;
-    modDirVersion = let
-      appendV =
-        if useRustForLinux
-        then ".0-rc1"
-        else "";
-    in
-      version + appendV + localVersion;
+    modDirVersion = version + lib.optionalString (!useRustForLinux) "-next-20241203" + localVersion;
   };
 
   kernelConfig = {
@@ -117,14 +96,15 @@ in {
         DEVTMPFS_MOUNT = yes;
 
         TTY = yes;
-        SERIAL_8250 = yes;
-        SERIAL_8250_CONSOLE = yes;
 
         PROC_FS = yes;
         SYSFS = yes;
 
         MODULES = yes;
         MODULE_UNLOAD = yes;
+
+        SERIAL_8250 = yes;
+        SERIAL_8250_CONSOLE = yes;
 
         # FW_LOADER = yes;
       }
@@ -140,6 +120,7 @@ in {
         RUST = yes;
         RUST_OVERFLOW_CHECKS = yes;
         RUST_DEBUG_ASSERTIONS = yes;
+        RUST_BUILD_ASSERT_ALLOW = no;
       }
       // lib.optionalAttrs enableGdb {
         DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT = yes;
