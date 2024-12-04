@@ -112,9 +112,12 @@
 
       genRustAnalyzer =
         pkgs.writers.writePython3Bin
-          "generate-rust-analyzer"
-          { }
+          "generate_rust_analyzer"
+          {
+            flakeIgnore = [ "E225" "E265" "E302" "E305" "E501" "F401" ];
+          }
           (builtins.readFile ./scripts/generate_rust_analyzer.py);
+
 
       devShell =
         let
